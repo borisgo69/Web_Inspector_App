@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Inspector</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <div class="hero__content">
+                <p class="eyebrow">Proyecto Python + Frontend Web</p>
+                <h1>Inspector web con analisis HTTP y soporte para Nmap</h1>
+                <p class="hero__text">
+                    Introduce una URL o dominio para revisar informacion basica del sitio, cabeceras,
+                    indicadores del HTML y, si `nmap` esta disponible, un escaneo rapido de puertos.
+                </p>
+                <p class="hero__notice">
+                    Usa esta herramienta solo sobre sistemas propios o con autorizacion expresa.
+                </p>
+            </div>
+            <div class="hero__panel">
+                <form id="inspect-form" class="inspect-form">
+                    <label for="target">URL o dominio</label>
+                    <div class="inspect-form__row">
+                        <input id="target" name="target" type="text" placeholder="ejemplo.com o https://ejemplo.com" required>
+                        <button type="submit">Inspeccionar</button>
+                    </div>
+                </form>
+                <div id="status-box" class="status-box" aria-live="polite">
+                    Esperando una URL para comenzar.
+                </div>
+            </div>
+        </header>
+
+        <main class="dashboard">
+            <section class="card metrics-card">
+                <h2>Resumen rapido</h2>
+                <div id="metrics-grid" class="metrics-grid">
+                    <article class="metric">
+                        <span class="metric__label">Estado</span>
+                        <strong class="metric__value">Sin datos</strong>
+                    </article>
+                    <article class="metric">
+                        <span class="metric__label">Respuesta</span>
+                        <strong class="metric__value">Sin datos</strong>
+                    </article>
+                    <article class="metric">
+                        <span class="metric__label">Formularios</span>
+                        <strong class="metric__value">Sin datos</strong>
+                    </article>
+                    <article class="metric">
+                        <span class="metric__label">Puertos abiertos</span>
+                        <strong class="metric__value">Sin datos</strong>
+                    </article>
+                </div>
+            </section>
+
+            <section class="results-grid">
+                <article class="card">
+                    <h2>Perfil del sitio</h2>
+                    <div id="site-profile" class="detail-list empty-state">
+                        Ejecuta una inspeccion para ver detalles del host.
+                    </div>
+                </article>
+
+                <article class="card">
+                    <h2>Cabeceras y hallazgos</h2>
+                    <div id="headers-panel" class="detail-list empty-state">
+                        Aqui apareceran las cabeceras mas relevantes y observaciones.
+                    </div>
+                </article>
+
+                <article class="card">
+                    <h2>Nmap</h2>
+                    <div id="nmap-panel" class="detail-list empty-state">
+                        El resultado del escaneo aparecera aqui si `nmap` esta disponible.
+                    </div>
+                </article>
+
+                <article class="card">
+                    <h2>TLS y enlaces</h2>
+                    <div id="tls-panel" class="detail-list empty-state">
+                        Se mostraran detalles TLS y estadisticas del HTML.
+                    </div>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,11 +1,15 @@
-const form = document.getElementById("inspect-form");
-const targetInput = document.getElementById("target");
-const statusBox = document.getElementById("status-box");
-const metricsGrid = document.getElementById("metrics-grid");
-const siteProfile = document.getElementById("site-profile");
-const headersPanel = document.getElementById("headers-panel");
-const nmapPanel = document.getElementById("nmap-panel");
-const tlsPanel = document.getElementById("tls-panel");
+const $ = (selector) => document.querySelector(selector);
+
+const form = $("#inspect-form");
+const targetInput = $("#target");
+const statusBox = $("#status-box");
+const panels = {
+    metrics: $("#metrics-grid"),
+    siteProfile: $("#site-profile"),
+    headers: $("#headers-panel"),
+    nmap: $("#nmap-panel"),
+    tls: $("#tls-panel")
+};
 
 function setStatus(message, isError = false) {
     statusBox.textContent = message;
@@ -22,35 +26,36 @@ function createDetailItem(label, value) {
     `;
 }
 
-function renderMetrics(data) {
-    const openPorts = data.nmap.open_ports?.length ?? 0;
-    metricsGrid.innerHTML = `
-        <article class="metric">
-            <span class="metric__label">Estado</span>
-            <strong class="metric__value">${data.web.status_code}</strong>
-        </article>
-        <article class="metric">
-            <span class="metric__label">Respuesta</span>
-            <strong class="metric__value">${data.web.response_time_ms} ms</strong>
-        </article>
-        <article class="metric">
-            <span class="metric__label">Formularios</span>
-            <strong class="metric__value">${data.web.forms}</strong>
-        </article>
-        <article class="metric">
-            <span class="metric__label">Puertos abiertos</span>
-            <strong class="metric__value">${openPorts}</strong>
-        </article>
-    `;
+function createTagList(items) {
+    const tags = (items || []).map((item) => `<span class="tag">${item}</span>`).join("");
+    return tags ? `<div class="tag-list">${tags}</div>` : "";
+}
+
+function renderMetrics({ web, nmap }) {
+    const metrics = [
+        ["Estado", web.status_code],
+        ["Respuesta", `${web.response_time_ms} ms`],
+        ["Formularios", web.forms],
+        ["Puertos abiertos", nmap.open_ports?.length ?? 0]
+    ];
+
+    panels.metrics.innerHTML = metrics
+        .map(([label, value]) => `
+            <article class="metric">
+                <span class="metric__label">${label}</span>
+                <strong class="metric__value">${value}</strong>
+            </article>
+        `)
+        .join("");
 }
 
 function renderSiteProfile(web) {
-    const ips = (web.ip_addresses || []).map((ip) => `<span class="tag">${ip}</span>`).join("");
-    siteProfile.innerHTML = `
+    const ips = createTagList(web.ip_addresses);
+    panels.siteProfile.innerHTML = `
         ${createDetailItem("Host", `<code>${web.host}</code>`)}
         ${createDetailItem("URL final", `<code>${web.final_url}</code>`)}
         ${createDetailItem("Titulo", web.title || "No encontrado")}
-        ${createDetailItem("IP(s)", ips ? `<div class="tag-list">${ips}</div>` : "Sin datos")}
+        ${createDetailItem("IP(s)", ips || "Sin datos")}
         ${createDetailItem("Meta generator", web.meta_generator || "No detectado")}
         ${createDetailItem("robots.txt", `<code>${web.robots_url}</code>`)}
     `;
@@ -60,34 +65,28 @@ function renderHeaders(web) {
     const headers = Object.entries(web.interesting_headers || {})
         .map(([key, value]) => createDetailItem(key, `<code>${value}</code>`))
         .join("");
+    const observations = createTagList(web.observations);
 
-    const observations = (web.observations || [])
-        .map((item) => `<span class="tag">${item}</span>`)
-        .join("");
-
-    headersPanel.innerHTML = `
+    panels.headers.innerHTML = `
         ${headers || createDetailItem("Cabeceras", "No se han encontrado cabeceras destacadas.")}
-        ${createDetailItem("Observaciones", observations ? `<div class="tag-list">${observations}</div>` : "Sin observaciones")}
+        ${createDetailItem("Observaciones", observations || "Sin observaciones")}
     `;
 }
 
 function renderNmap(nmap) {
     if (!nmap.available) {
-        nmapPanel.innerHTML = createDetailItem("Estado", nmap.message);
+        panels.nmap.innerHTML = createDetailItem("Estado", nmap.message);
         return;
     }
 
     const ports = (nmap.open_ports || [])
         .map((port) => {
             const description = [port.service, port.product, port.version].filter(Boolean).join(" ");
-            return createDetailItem(
-                `${port.protocol}/${port.port}`,
-                description || "Servicio no identificado"
-            );
+            return createDetailItem(`${port.protocol}/${port.port}`, description || "Servicio no identificado");
         })
         .join("");
 
-    nmapPanel.innerHTML = `
+    panels.nmap.innerHTML = `
         ${createDetailItem("Comando", `<code>${nmap.command || "N/D"}</code>`)}
         ${createDetailItem("Resumen", nmap.message || "Sin resumen")}
         ${ports || createDetailItem("Puertos", "No hay puertos abiertos en este perfil o nmap no devolvio resultados.")}
@@ -101,23 +100,29 @@ function renderTlsAndLinks(web) {
               .join("")
         : createDetailItem("TLS", "No aplica o no se han podido extraer datos TLS.");
 
-    const linkStats = `
-        ${createDetailItem("Enlaces internos", String(web.internal_links))}
-        ${createDetailItem("Enlaces externos", String(web.external_links))}
-        ${createDetailItem("Scripts", String(web.scripts))}
-        ${createDetailItem("Inputs password", String(web.password_inputs))}
-        ${createDetailItem("Tamano HTML", `${web.content_length} caracteres`)}
-    `;
+    const linkStats = [
+        ["Enlaces internos", String(web.internal_links)],
+        ["Enlaces externos", String(web.external_links)],
+        ["Scripts", String(web.scripts)],
+        ["Inputs password", String(web.password_inputs)],
+        ["Tamano HTML", `${web.content_length} caracteres`]
+    ];
 
-    tlsPanel.innerHTML = `${tlsHtml}${linkStats}`;
+    panels.tls.innerHTML = `${tlsHtml}${linkStats.map(([label, value]) => createDetailItem(label, value)).join("")}`;
+}
+
+function renderReport(data) {
+    renderMetrics(data);
+    renderSiteProfile(data.web);
+    renderHeaders(data.web);
+    renderNmap(data.nmap);
+    renderTlsAndLinks(data.web);
 }
 
 async function inspectTarget(target) {
     const response = await fetch("/api/inspect", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target })
     });
 
@@ -143,11 +148,7 @@ form.addEventListener("submit", async (event) => {
 
     try {
         const data = await inspectTarget(target);
-        renderMetrics(data);
-        renderSiteProfile(data.web);
-        renderHeaders(data.web);
-        renderNmap(data.nmap);
-        renderTlsAndLinks(data.web);
+        renderReport(data);
         setStatus(`Inspeccion completada para ${data.web.final_url}`);
     } catch (error) {
         setStatus(error.message, true);

@@ -17,6 +17,21 @@ SECURITY_HEADERS = {
     "referrer-policy": "Falta Referrer-Policy.",
 }
 
+INTERESTING_HEADERS = {
+    "server",
+    "content-type",
+    "content-security-policy",
+    "strict-transport-security",
+    "x-frame-options",
+    "x-content-type-options",
+    "referrer-policy",
+    "x-powered-by",
+    "set-cookie",
+}
+
+REQUEST_HEADERS = {"User-Agent": "WebInspector/1.0"}
+HTML_PREVIEW_LIMIT = 250000
+
 
 class DocumentStatsParser(HTMLParser):
     def __init__(self, base_host: str) -> None:
@@ -157,7 +172,7 @@ def inspect_target(target: str) -> dict[str, Any]:
             normalized_url,
             timeout=10,
             allow_redirects=True,
-            headers={"User-Agent": "WebInspector/1.0"},
+            headers=REQUEST_HEADERS,
         )
     except requests.RequestException as exc:
         raise ValueError(f"No se ha podido recuperar la URL: {exc}") from exc
@@ -173,7 +188,7 @@ def inspect_target(target: str) -> dict[str, Any]:
         raise ValueError("No se ha podido resolver el dominio indicado.") from exc
 
     parser = DocumentStatsParser(base_host=final_host)
-    parser.feed(response.text[:250000])
+    parser.feed(response.text[:HTML_PREVIEW_LIMIT])
 
     tls_details = None
     if response.url.startswith("https://"):
@@ -185,18 +200,7 @@ def inspect_target(target: str) -> dict[str, Any]:
     interesting_headers = {
         key: value
         for key, value in response.headers.items()
-        if key.lower()
-        in {
-            "server",
-            "content-type",
-            "content-security-policy",
-            "strict-transport-security",
-            "x-frame-options",
-            "x-content-type-options",
-            "referrer-policy",
-            "x-powered-by",
-            "set-cookie",
-        }
+        if key.lower() in INTERESTING_HEADERS
     }
 
     observations = _build_observations(

@@ -157,7 +157,7 @@ def inspect_target(target: str) -> dict[str, Any]:
             normalized_url,
             timeout=10,
             allow_redirects=True,
-            headers={"User-Agent": "WebInspector/1.0"},
+            headers={"User-Agent": "VulnerawebAnalytics/1.0"},
         )
     except requests.RequestException as exc:
         raise ValueError(f"No se ha podido recuperar la URL: {exc}") from exc

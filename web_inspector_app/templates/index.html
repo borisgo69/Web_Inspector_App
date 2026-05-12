@@ -3,43 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Inspector</title>
+    <title>Vulneraweb Analytics</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <div class="page-shell">
-        <header class="hero">
-            <div class="hero__content">
-                <p class="eyebrow">Proyecto Python + Frontend Web</p>
-                <h1>Inspector web con analisis HTTP y soporte para Nmap</h1>
-                <p class="hero__text">
-                    Introduce una URL o dominio para revisar informacion basica del sitio, cabeceras,
-                    indicadores del HTML y, si `nmap` esta disponible, un escaneo rapido de puertos.
-                </p>
-                <p class="hero__notice">
-                    Usa esta herramienta solo sobre sistemas propios o con autorizacion expresa.
-                </p>
-            </div>
-            <div class="hero__panel">
-                <form id="inspect-form" class="inspect-form">
-                    <label for="target">URL o dominio</label>
-                    <div class="inspect-form__row">
-                        <input id="target" name="target" type="text" placeholder="ejemplo.com o https://ejemplo.com" required>
-                        <button type="submit">Inspeccionar</button>
-                    </div>
-                </form>
-                <div id="status-box" class="status-box" aria-live="polite">
-                    Esperando una URL para comenzar.
+    <div class="app-shell">
+        <header class="app-header">
+            <div class="brand">
+                <span class="brand__mark">VA</span>
+                <div>
+                    <p class="eyebrow">Security dashboard</p>
+                    <h1>Vulneraweb Analytics</h1>
                 </div>
+            </div>
+            <div class="app-header__meta">
+                <span class="status-dot"></span>
+                <span>Uso autorizado</span>
             </div>
         </header>
 
         <main class="dashboard">
-            <section class="card metrics-card">
-                <h2>Resumen rapido</h2>
+            <section class="dashboard-top">
+                <article class="panel scan-panel">
+                    <div class="panel__heading">
+                        <div>
+                            <p class="eyebrow">Nuevo escaneo</p>
+                            <h2>Objetivo</h2>
+                        </div>
+                    </div>
+                    <form id="inspect-form" class="inspect-form">
+                        <label for="target">IP, URL o dominio</label>
+                        <div class="inspect-form__row">
+                            <input id="target" name="target" type="text" placeholder="192.168.1.1 o ejemplo.com" required>
+                            <button type="submit">Analizar</button>
+                        </div>
+                    </form>
+                    <div id="status-box" class="status-box" aria-live="polite">
+                        Esperando objetivo.
+                    </div>
+                </article>
+
+                <article class="panel history-panel">
+                    <div class="panel__heading">
+                        <div>
+                            <p class="eyebrow">Persistencia JSON</p>
+                            <h2>Historial</h2>
+                        </div>
+                    </div>
+                    <div id="history-list" class="history-list empty-state">
+                        Sin escaneos guardados.
+                    </div>
+                </article>
+            </section>
+
+            <section class="panel metrics-panel">
+                <div class="panel__heading">
+                    <div>
+                        <p class="eyebrow">Resumen</p>
+                        <h2>Indicadores principales</h2>
+                    </div>
+                </div>
                 <div id="metrics-grid" class="metrics-grid">
                     <article class="metric">
-                        <span class="metric__label">Estado</span>
+                        <span class="metric__label">Estado HTTP</span>
                         <strong class="metric__value">Sin datos</strong>
                     </article>
                     <article class="metric">
@@ -58,34 +84,46 @@
             </section>
 
             <section class="results-grid">
-                <article class="card">
-                    <h2>Perfil del sitio</h2>
+                <article class="panel">
+                    <div class="panel__heading">
+                        <h2>Perfil del sitio</h2>
+                    </div>
                     <div id="site-profile" class="detail-list empty-state">
-                        Ejecuta una inspeccion para ver detalles del host.
+                        Sin datos.
                     </div>
                 </article>
 
-                <article class="card">
-                    <h2>Cabeceras y hallazgos</h2>
+                <article class="panel">
+                    <div class="panel__heading">
+                        <h2>Cabeceras y hallazgos</h2>
+                    </div>
                     <div id="headers-panel" class="detail-list empty-state">
-                        Aqui apareceran las cabeceras mas relevantes y observaciones.
+                        Sin datos.
                     </div>
                 </article>
 
-                <article class="card">
-                    <h2>Nmap</h2>
+                <article class="panel">
+                    <div class="panel__heading">
+                        <h2>Nmap</h2>
+                    </div>
                     <div id="nmap-panel" class="detail-list empty-state">
-                        El resultado del escaneo aparecera aqui si `nmap` esta disponible.
+                        Sin datos.
                     </div>
                 </article>
 
-                <article class="card">
-                    <h2>TLS y enlaces</h2>
+                <article class="panel">
+                    <div class="panel__heading">
+                        <h2>TLS y enlaces</h2>
+                    </div>
                     <div id="tls-panel" class="detail-list empty-state">
-                        Se mostraran detalles TLS y estadisticas del HTML.
+                        Sin datos.
                     </div>
                 </article>
             </section>
+
+            <div id="command-used" class="command-used">
+                Comando: pendiente.
+            </div>
         </main>
     </div>
 

@@ -1,0 +1,32 @@
+[
+  {
+    "generated_at": "2026-05-08T08:04:49.349944+00:00",
+    "target": "nmap.org",
+    "host": "nmap.org",
+    "final_url": "https://nmap.org/",
+    "status_code": 200,
+    "response_time_ms": 1015,
+    "open_ports": 4,
+    "command": "nmap -Pn -T3 --top-ports 20 nmap.org -oX -"
+  },
+  {
+    "generated_at": "2026-05-08T07:52:35.437327+00:00",
+    "target": "bwapp.hakhub.net",
+    "host": "bwapp.hakhub.net",
+    "final_url": "https://bwapp.hakhub.net/",
+    "status_code": 502,
+    "response_time_ms": 1042,
+    "open_ports": 3,
+    "command": "nmap -Pn -T3 --top-ports 20 bwapp.hakhub.net -oX -"
+  },
+  {
+    "generated_at": "2026-05-08T07:51:57.646686+00:00",
+    "target": "demo.testfire.net",
+    "host": "demo.testfire.net",
+    "final_url": "https://demo.testfire.net/",
+    "status_code": 200,
+    "response_time_ms": 989,
+    "open_ports": 4,
+    "command": "nmap -Pn -T3 --top-ports 20 demo.testfire.net -oX -"
+  }
+]

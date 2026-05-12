@@ -1,4 +1,4 @@
-# Web Inspector
+# Vulneraweb Analytics
 
 Aplicacion web hecha con Python, HTML, CSS y JavaScript para inspeccionar un sitio a nivel basico:
 
@@ -6,7 +6,9 @@ Aplicacion web hecha con Python, HTML, CSS y JavaScript para inspeccionar un sit
 - Respuesta HTTP y cabeceras relevantes
 - Conteo de formularios, scripts y enlaces
 - Lectura basica de TLS en sitios HTTPS
-- Integracion con `nmap` para obtener puertos abiertos si la herramienta esta instalada
+- Integracion con `nmap` para obtener estados de puertos si la herramienta esta instalada
+- Historial de escaneos persistido en `data/scan_history.json`
+- Validacion basica de IP, URL o dominio antes de ejecutar la inspeccion
 
 ## Estructura
 
@@ -47,7 +49,7 @@ La aplicacion quedara disponible en `http://127.0.0.1:5000`.
 La app intenta ejecutar este comando:
 
 ```text
-nmap -Pn -T3 --top-ports 20 --open <host> -oX -
+nmap -Pn -T3 --top-ports 20 <host> -oX -
 ```
 
 Si `nmap` no esta instalado o no esta en `PATH`, la aplicacion seguira funcionando y mostrara un aviso.

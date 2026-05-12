@@ -6,38 +6,131 @@ const siteProfile = document.getElementById("site-profile");
 const headersPanel = document.getElementById("headers-panel");
 const nmapPanel = document.getElementById("nmap-panel");
 const tlsPanel = document.getElementById("tls-panel");
+const historyList = document.getElementById("history-list");
+const commandUsed = document.getElementById("command-used");
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function asCode(value) {
+    return `<code>${escapeHtml(value || "N/D")}</code>`;
+}
 
 function setStatus(message, isError = false) {
     statusBox.textContent = message;
-    statusBox.style.color = isError ? "#9b1c1c" : "";
-    statusBox.style.borderColor = isError ? "rgba(155, 28, 28, 0.35)" : "";
+    statusBox.classList.toggle("is-error", isError);
 }
 
-function createDetailItem(label, value) {
+function createDetailItem(label, value, isHtml = false) {
     return `
         <div class="detail-item">
-            <strong>${label}</strong>
-            <div>${value}</div>
+            <strong>${escapeHtml(label)}</strong>
+            <div>${isHtml ? value : escapeHtml(value)}</div>
         </div>
     `;
 }
 
+function createTagList(items) {
+    return items.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("");
+}
+
+function extractHostFromInput(target) {
+    const raw = target.trim();
+    if (!raw) {
+        return "";
+    }
+
+    if (!raw.includes("://")) {
+        const pathless = raw.split("/")[0];
+        if (pathless.includes(":") && pathless.split(":").length > 2) {
+            return pathless.replace(/^\[/, "").replace(/\]$/, "");
+        }
+    }
+
+    try {
+        return new URL(raw.includes("://") ? raw : `http://${raw}`).hostname;
+    } catch {
+        return raw.split("/")[0].split(":")[0];
+    }
+}
+
+function isValidIpv4(host) {
+    const parts = host.split(".");
+    return parts.length === 4 && parts.every((part) => {
+        if (!/^\d+$/.test(part)) {
+            return false;
+        }
+
+        const number = Number(part);
+        return number >= 0 && number <= 255;
+    });
+}
+
+function isValidDomain(host) {
+    const labels = host.split(".");
+    if (labels.length < 2) {
+        return false;
+    }
+
+    return labels.every((label) => {
+        if (!label || label.length > 63) {
+            return false;
+        }
+        if (label.startsWith("-") || label.endsWith("-")) {
+            return false;
+        }
+        return /^[a-z0-9-]+$/i.test(label);
+    });
+}
+
+function isValidTargetFormat(target) {
+    const host = extractHostFromInput(target);
+
+    if (!host) {
+        return false;
+    }
+
+    if (isValidIpv4(host)) {
+        return true;
+    }
+
+    if (host.includes(":")) {
+        return true;
+    }
+
+    if (host.includes(".") && /^[0-9.]+$/.test(host)) {
+        return false;
+    }
+
+    return isValidDomain(host);
+}
+
 function renderMetrics(data) {
     const openPorts = data.nmap.open_ports?.length ?? 0;
+    const statusCode = Number(data.web.status_code);
+    const statusClass = statusCode >= 200 && statusCode < 400 ? "metric--success" : "metric--danger";
+    const portClass = openPorts > 0 ? "metric--success" : "metric--danger";
+
     metricsGrid.innerHTML = `
-        <article class="metric">
-            <span class="metric__label">Estado</span>
-            <strong class="metric__value">${data.web.status_code}</strong>
+        <article class="metric ${statusClass}">
+            <span class="metric__label">Estado HTTP</span>
+            <strong class="metric__value">${escapeHtml(data.web.status_code)}</strong>
         </article>
         <article class="metric">
             <span class="metric__label">Respuesta</span>
-            <strong class="metric__value">${data.web.response_time_ms} ms</strong>
+            <strong class="metric__value">${escapeHtml(data.web.response_time_ms)} ms</strong>
         </article>
         <article class="metric">
             <span class="metric__label">Formularios</span>
-            <strong class="metric__value">${data.web.forms}</strong>
+            <strong class="metric__value">${escapeHtml(data.web.forms)}</strong>
         </article>
-        <article class="metric">
+        <article class="metric ${portClass}">
             <span class="metric__label">Puertos abiertos</span>
             <strong class="metric__value">${openPorts}</strong>
         </article>
@@ -45,52 +138,92 @@ function renderMetrics(data) {
 }
 
 function renderSiteProfile(web) {
-    const ips = (web.ip_addresses || []).map((ip) => `<span class="tag">${ip}</span>`).join("");
+    const ips = createTagList(web.ip_addresses || []);
+    siteProfile.classList.remove("empty-state");
     siteProfile.innerHTML = `
-        ${createDetailItem("Host", `<code>${web.host}</code>`)}
-        ${createDetailItem("URL final", `<code>${web.final_url}</code>`)}
+        ${createDetailItem("Host", asCode(web.host), true)}
+        ${createDetailItem("URL final", asCode(web.final_url), true)}
         ${createDetailItem("Titulo", web.title || "No encontrado")}
-        ${createDetailItem("IP(s)", ips ? `<div class="tag-list">${ips}</div>` : "Sin datos")}
+        ${createDetailItem("IP(s)", ips ? `<div class="tag-list">${ips}</div>` : "Sin datos", Boolean(ips))}
         ${createDetailItem("Meta generator", web.meta_generator || "No detectado")}
-        ${createDetailItem("robots.txt", `<code>${web.robots_url}</code>`)}
+        ${createDetailItem("robots.txt", asCode(web.robots_url), true)}
     `;
 }
 
 function renderHeaders(web) {
     const headers = Object.entries(web.interesting_headers || {})
-        .map(([key, value]) => createDetailItem(key, `<code>${value}</code>`))
+        .map(([key, value]) => createDetailItem(key, asCode(value), true))
         .join("");
 
-    const observations = (web.observations || [])
-        .map((item) => `<span class="tag">${item}</span>`)
-        .join("");
-
+    const observations = createTagList(web.observations || []);
+    headersPanel.classList.remove("empty-state");
     headersPanel.innerHTML = `
         ${headers || createDetailItem("Cabeceras", "No se han encontrado cabeceras destacadas.")}
-        ${createDetailItem("Observaciones", observations ? `<div class="tag-list">${observations}</div>` : "Sin observaciones")}
+        ${createDetailItem("Observaciones", observations ? `<div class="tag-list">${observations}</div>` : "Sin observaciones", Boolean(observations))}
     `;
 }
 
+function getStateText(state) {
+    const labels = {
+        open: "Abierto",
+        closed: "Cerrado",
+        filtered: "Filtrado",
+        unknown: "Desconocido"
+    };
+    return labels[state] || state;
+}
+
+function getStateClass(state) {
+    if (state === "open") {
+        return "open";
+    }
+    if (state === "closed") {
+        return "closed";
+    }
+    return "filtered";
+}
+
+function renderPortRow(port) {
+    const description = [port.service, port.product, port.version].filter(Boolean).join(" ");
+    const stateClass = getStateClass(port.state);
+
+    return `
+        <div class="port-row port-row--${stateClass}">
+            <span class="port-row__name">${escapeHtml(port.protocol)}/${escapeHtml(port.port)}</span>
+            <span class="port-row__service">${escapeHtml(description || "Servicio no identificado")}</span>
+            <span class="state-pill state-pill--${stateClass}">${escapeHtml(getStateText(port.state))}</span>
+        </div>
+    `;
+}
+
+function updateCommand(command) {
+    commandUsed.innerHTML = `Comando: ${asCode(command || "pendiente")}`;
+}
+
 function renderNmap(nmap) {
+    updateCommand(nmap.command);
+    nmapPanel.classList.remove("empty-state");
+
     if (!nmap.available) {
-        nmapPanel.innerHTML = createDetailItem("Estado", nmap.message);
+        nmapPanel.innerHTML = createDetailItem("Estado", nmap.message || "Nmap no disponible.");
         return;
     }
 
-    const ports = (nmap.open_ports || [])
-        .map((port) => {
-            const description = [port.service, port.product, port.version].filter(Boolean).join(" ");
-            return createDetailItem(
-                `${port.protocol}/${port.port}`,
-                description || "Servicio no identificado"
-            );
-        })
-        .join("");
+    const scannedPorts = nmap.scanned_ports?.length
+        ? nmap.scanned_ports
+        : (nmap.open_ports || []).map((port) => ({ ...port, state: "open" }));
+
+    const portsHtml = scannedPorts.length
+        ? `<div class="ports-list">${scannedPorts.map(renderPortRow).join("")}</div>`
+        : createDetailItem(
+              "Puertos",
+              '<span class="state-pill state-pill--closed">Cerrado</span> No hay puertos abiertos en este perfil.',
+              true
+          );
 
     nmapPanel.innerHTML = `
-        ${createDetailItem("Comando", `<code>${nmap.command || "N/D"}</code>`)}
         ${createDetailItem("Resumen", nmap.message || "Sin resumen")}
-        ${ports || createDetailItem("Puertos", "No hay puertos abiertos en este perfil o nmap no devolvio resultados.")}
+        ${portsHtml}
     `;
 }
 
@@ -109,7 +242,58 @@ function renderTlsAndLinks(web) {
         ${createDetailItem("Tamano HTML", `${web.content_length} caracteres`)}
     `;
 
+    tlsPanel.classList.remove("empty-state");
     tlsPanel.innerHTML = `${tlsHtml}${linkStats}`;
+}
+
+function formatDate(dateValue) {
+    if (!dateValue) {
+        return "Fecha no disponible";
+    }
+
+    return new Date(dateValue).toLocaleString("es-ES", {
+        dateStyle: "short",
+        timeStyle: "short"
+    });
+}
+
+function renderHistory(history) {
+    if (!history || history.length === 0) {
+        historyList.classList.add("empty-state");
+        historyList.textContent = "Sin escaneos guardados.";
+        return;
+    }
+
+    historyList.classList.remove("empty-state");
+    historyList.innerHTML = history
+        .map((entry) => {
+            const openPorts = Number(entry.open_ports || 0);
+            const stateClass = openPorts > 0 ? "open" : "closed";
+
+            return `
+                <article class="history-item">
+                    <div class="history-item__top">
+                        <span class="history-item__target">${escapeHtml(entry.host || entry.target)}</span>
+                        <span class="state-pill state-pill--${stateClass}">${openPorts} abiertos</span>
+                    </div>
+                    <div class="history-item__meta">
+                        <span>${escapeHtml(formatDate(entry.generated_at))}</span>
+                        <span>HTTP ${escapeHtml(entry.status_code || "N/D")}</span>
+                        <span>${escapeHtml(entry.response_time_ms || "N/D")} ms</span>
+                    </div>
+                </article>
+            `;
+        })
+        .join("");
+}
+
+function renderReport(data) {
+    renderMetrics(data);
+    renderSiteProfile(data.web);
+    renderHeaders(data.web);
+    renderNmap(data.nmap);
+    renderTlsAndLinks(data.web);
+    renderHistory(data.history);
 }
 
 async function inspectTarget(target) {
@@ -128,30 +312,46 @@ async function inspectTarget(target) {
     return data;
 }
 
+async function loadHistory() {
+    try {
+        const response = await fetch("/api/history");
+        const data = await response.json();
+
+        if (response.ok && data.ok) {
+            renderHistory(data.history);
+        }
+    } catch {
+        historyList.textContent = "No se ha podido cargar el historial.";
+    }
+}
+
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const target = targetInput.value.trim();
 
     if (!target) {
-        setStatus("Escribe una URL o dominio para continuar.", true);
+        setStatus("Escribe una IP, URL o dominio para continuar.", true);
+        return;
+    }
+
+    if (!isValidTargetFormat(target)) {
+        setStatus("Dirección IP no válida", true);
         return;
     }
 
     const submitButton = form.querySelector("button");
     submitButton.disabled = true;
-    setStatus(`Inspeccionando ${target}...`);
+    setStatus(`Analizando ${target}...`);
 
     try {
         const data = await inspectTarget(target);
-        renderMetrics(data);
-        renderSiteProfile(data.web);
-        renderHeaders(data.web);
-        renderNmap(data.nmap);
-        renderTlsAndLinks(data.web);
-        setStatus(`Inspeccion completada para ${data.web.final_url}`);
+        renderReport(data);
+        setStatus(`Analisis completado para ${data.web.final_url}`);
     } catch (error) {
         setStatus(error.message, true);
     } finally {
         submitButton.disabled = false;
     }
 });
+
+loadHistory();

@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 from flask import Flask, jsonify, render_template, request
 
 from services.nmap_service import run_nmap_scan
-from services.web_analyzer import inspect_target
+from services.web_analyzer import calculate_risk_report, inspect_target
 
 
 app = Flask(__name__)
@@ -55,11 +55,33 @@ def _is_valid_domain(host: str) -> bool:
     return True
 
 
+def _read_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "on", "yes", "si"}
+
+    return bool(value)
+
+
 def _validate_target(target: str) -> None:
-    host = _extract_host(target)
+    trimmed = target.strip()
+
+    if not trimmed:
+        raise ValueError("El campo objetivo no puede estar vacio.")
+
+    has_scheme = "://" in trimmed
+    if has_scheme:
+        parsed_url = urlparse(trimmed)
+        if not parsed_url.scheme or not parsed_url.netloc or not parsed_url.hostname:
+            raise ValueError("La URL esta mal formada.")
+
+    host = _extract_host(trimmed)
 
     if not host:
-        raise ValueError("Dirección IP no válida")
+        message = "La URL esta mal formada." if has_scheme else "Introduce una IP, dominio o URL validos."
+        raise ValueError(message)
 
     try:
         ipaddress.ip_address(host)
@@ -67,8 +89,11 @@ def _validate_target(target: str) -> None:
     except ValueError:
         pass
 
-    if _looks_like_invalid_ip(host) or not _is_valid_domain(host):
-        raise ValueError("Dirección IP no válida")
+    if _looks_like_invalid_ip(host):
+        raise ValueError("La IP indicada no es valida.")
+
+    if not _is_valid_domain(host):
+        raise ValueError("El dominio indicado no es valido.")
 
 
 def _load_scan_history() -> list[dict]:
@@ -129,14 +154,29 @@ def history():
 def inspect():
     payload = request.get_json(silent=True) or request.form.to_dict()
     target = (payload.get("target") or "").strip()
+    skip_nmap_value = payload.get("skip_nmap")
+    if skip_nmap_value is None:
+        skip_nmap_value = payload.get("skipNmap")
+    skip_nmap = _read_bool(skip_nmap_value)
 
     if not target:
-        return jsonify({"ok": False, "error": "Indica una IP, URL o dominio para analizar."}), 400
+        return jsonify({"ok": False, "error": "El campo objetivo no puede estar vacio."}), 400
 
     try:
         _validate_target(target)
         web_report = inspect_target(target)
-        nmap_report = run_nmap_scan(web_report["host"])
+        risk_report = calculate_risk_report(web_report)
+        if skip_nmap:
+            nmap_report = {
+                "available": True,
+                "executed": False,
+                "message": "Escaneo nmap omitido por el usuario",
+                "open_ports": [],
+                "scanned_ports": [],
+                "command": "",
+            }
+        else:
+            nmap_report = run_nmap_scan(web_report["host"])
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:
@@ -152,6 +192,7 @@ def inspect():
         "ok": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "web": web_report,
+        "risk": risk_report,
         "nmap": nmap_report,
     }
     report["history"] = _save_scan_history(report)

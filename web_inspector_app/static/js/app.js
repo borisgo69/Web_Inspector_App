@@ -1,5 +1,7 @@
 const form = document.getElementById("inspect-form");
 const targetInput = document.getElementById("target");
+const skipNmapInput = document.getElementById("skip-nmap");
+const downloadReportButton = document.getElementById("download-report");
 const statusBox = document.getElementById("status-box");
 const metricsGrid = document.getElementById("metrics-grid");
 const siteProfile = document.getElementById("site-profile");
@@ -8,6 +10,15 @@ const nmapPanel = document.getElementById("nmap-panel");
 const tlsPanel = document.getElementById("tls-panel");
 const historyList = document.getElementById("history-list");
 const commandUsed = document.getElementById("command-used");
+var lastReport = null;
+
+const SECURITY_HEADER_HELP = {
+    "content-security-policy": "Ayuda a reducir ataques XSS limitando los recursos que puede cargar la pagina.",
+    "strict-transport-security": "Fuerza el uso de HTTPS en futuras visitas.",
+    "x-frame-options": "Ayuda a evitar que la pagina se cargue dentro de marcos maliciosos.",
+    "x-content-type-options": "Evita que el navegador interprete archivos con un tipo distinto al declarado.",
+    "referrer-policy": "Controla cuanta informacion de origen se envia al abrir enlaces externos."
+};
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -38,6 +49,38 @@ function createDetailItem(label, value, isHtml = false) {
 
 function createTagList(items) {
     return items.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("");
+}
+
+function getHeaderHelp(headerName) {
+    return SECURITY_HEADER_HELP[String(headerName || "").toLowerCase()] || "";
+}
+
+function getObservationHelp(observation) {
+    const normalized = String(observation || "").toLowerCase();
+    const match = Object.keys(SECURITY_HEADER_HELP).find((headerName) => normalized.includes(headerName));
+    return match ? SECURITY_HEADER_HELP[match] : "";
+}
+
+function withHelp(content, helpText) {
+    const help = helpText ? `<p class="help-text">${escapeHtml(helpText)}</p>` : "";
+    return `${content}${help}`;
+}
+
+function renderObservation(observation) {
+    const help = getObservationHelp(observation);
+
+    return `
+        <div class="observation-item">
+            <span class="tag">${escapeHtml(observation)}</span>
+            ${help ? `<p class="help-text">${escapeHtml(help)}</p>` : ""}
+        </div>
+    `;
+}
+
+function updateDownloadButton() {
+    if (downloadReportButton) {
+        downloadReportButton.disabled = !lastReport;
+    }
 }
 
 function extractHostFromInput(target) {
@@ -111,11 +154,30 @@ function isValidTargetFormat(target) {
     return isValidDomain(host);
 }
 
+function getRiskClass(level) {
+    if (level === "Bajo") {
+        return "metric--success";
+    }
+    if (level === "Medio") {
+        return "metric--warning";
+    }
+    if (level === "Alto") {
+        return "metric--danger";
+    }
+    return "";
+}
+
 function renderMetrics(data) {
+    const nmapExecuted = data.nmap.executed !== false;
     const openPorts = data.nmap.open_ports?.length ?? 0;
+    const openPortsValue = nmapExecuted ? openPorts : "Omitido";
     const statusCode = Number(data.web.status_code);
     const statusClass = statusCode >= 200 && statusCode < 400 ? "metric--success" : "metric--danger";
-    const portClass = openPorts > 0 ? "metric--success" : "metric--danger";
+    const portClass = nmapExecuted ? (openPorts > 0 ? "metric--success" : "metric--danger") : "";
+    const risk = data.risk || {};
+    const riskLevel = risk.level || "Sin datos";
+    const riskPoints = Number.isFinite(Number(risk.points)) ? `${risk.points} puntos` : "";
+    const riskClass = getRiskClass(riskLevel);
 
     metricsGrid.innerHTML = `
         <article class="metric ${statusClass}">
@@ -132,7 +194,12 @@ function renderMetrics(data) {
         </article>
         <article class="metric ${portClass}">
             <span class="metric__label">Puertos abiertos</span>
-            <strong class="metric__value">${openPorts}</strong>
+            <strong class="metric__value">${escapeHtml(openPortsValue)}</strong>
+        </article>
+        <article class="metric ${riskClass}">
+            <span class="metric__label">Riesgo</span>
+            <strong class="metric__value">${escapeHtml(riskLevel)}</strong>
+            ${riskPoints ? `<span class="metric__note">${escapeHtml(riskPoints)}</span>` : ""}
         </article>
     `;
 }
@@ -152,14 +219,14 @@ function renderSiteProfile(web) {
 
 function renderHeaders(web) {
     const headers = Object.entries(web.interesting_headers || {})
-        .map(([key, value]) => createDetailItem(key, asCode(value), true))
+        .map(([key, value]) => createDetailItem(key, withHelp(asCode(value), getHeaderHelp(key)), true))
         .join("");
 
-    const observations = createTagList(web.observations || []);
+    const observations = (web.observations || []).map(renderObservation).join("");
     headersPanel.classList.remove("empty-state");
     headersPanel.innerHTML = `
         ${headers || createDetailItem("Cabeceras", "No se han encontrado cabeceras destacadas.")}
-        ${createDetailItem("Observaciones", observations ? `<div class="tag-list">${observations}</div>` : "Sin observaciones", Boolean(observations))}
+        ${createDetailItem("Observaciones", observations ? `<div class="observation-list">${observations}</div>` : "Sin observaciones", Boolean(observations))}
     `;
 }
 
@@ -201,8 +268,13 @@ function updateCommand(command) {
 }
 
 function renderNmap(nmap) {
-    updateCommand(nmap.command);
+    updateCommand(nmap.command || "no ejecutado");
     nmapPanel.classList.remove("empty-state");
+
+    if (nmap.executed === false) {
+        nmapPanel.innerHTML = createDetailItem("Estado", nmap.message || "Escaneo nmap no ejecutado.");
+        return;
+    }
 
     if (!nmap.available) {
         nmapPanel.innerHTML = createDetailItem("Estado", nmap.message || "Nmap no disponible.");
@@ -288,6 +360,8 @@ function renderHistory(history) {
 }
 
 function renderReport(data) {
+    lastReport = data;
+    updateDownloadButton();
     renderMetrics(data);
     renderSiteProfile(data.web);
     renderHeaders(data.web);
@@ -296,13 +370,13 @@ function renderReport(data) {
     renderHistory(data.history);
 }
 
-async function inspectTarget(target) {
+async function inspectTarget(target, skipNmap) {
     const response = await fetch("/api/inspect", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ target })
+        body: JSON.stringify({ target, skip_nmap: skipNmap })
     });
 
     const data = await response.json();
@@ -325,6 +399,26 @@ async function loadHistory() {
     }
 }
 
+if (downloadReportButton) {
+    downloadReportButton.addEventListener("click", () => {
+        if (!lastReport) {
+            return;
+        }
+
+        const blob = new Blob([JSON.stringify(lastReport, null, 2)], {
+            type: "application/json"
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "web-inspector-report.json";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+    });
+}
+
 form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const target = targetInput.value.trim();
@@ -335,23 +429,30 @@ form.addEventListener("submit", async (event) => {
     }
 
     if (!isValidTargetFormat(target)) {
-        setStatus("Dirección IP no válida", true);
+        setStatus("Introduce una IP, dominio o URL validos.", true);
         return;
     }
 
-    const submitButton = form.querySelector("button");
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
+    const skipNmap = Boolean(skipNmapInput?.checked);
     submitButton.disabled = true;
+    submitButton.textContent = "Analizando...";
+    submitButton.classList.add("is-loading");
     setStatus(`Analizando ${target}...`);
 
     try {
-        const data = await inspectTarget(target);
+        const data = await inspectTarget(target, skipNmap);
         renderReport(data);
         setStatus(`Analisis completado para ${data.web.final_url}`);
     } catch (error) {
         setStatus(error.message, true);
     } finally {
         submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+        submitButton.classList.remove("is-loading");
     }
 });
 
+updateDownloadButton();
 loadHistory();

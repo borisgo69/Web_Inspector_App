@@ -146,6 +146,58 @@ def _build_observations(headers: dict[str, str], response_time_ms: int, is_https
     return observations
 
 
+def calculate_risk_report(web_report: dict[str, Any]) -> dict[str, Any]:
+    headers = {
+        key.lower(): value
+        for key, value in web_report.get("interesting_headers", {}).items()
+    }
+    final_url = web_report.get("final_url", "")
+    is_https = final_url.startswith("https://")
+    tls_details = web_report.get("tls")
+
+    missing_headers = [
+        header_name
+        for header_name in SECURITY_HEADERS
+        if header_name not in headers and not (header_name == "strict-transport-security" and not is_https)
+    ]
+
+    points = 0
+    reasons = []
+
+    if missing_headers:
+        points += 1
+        reasons.append("Faltan cabeceras de seguridad relevantes.")
+
+    if not is_https:
+        points += 1
+        reasons.append("La URL final usa HTTP sin HTTPS.")
+    elif not tls_details or (isinstance(tls_details, dict) and tls_details.get("error")):
+        points += 1
+        reasons.append("No se han podido confirmar los detalles TLS.")
+
+    if int(web_report.get("password_inputs") or 0) > 0:
+        points += 1
+        reasons.append("Hay campos de password en formularios.")
+
+    if int(web_report.get("response_time_ms") or 0) > 2000:
+        points += 1
+        reasons.append("La respuesta es lenta.")
+
+    if points <= 1:
+        level = "Bajo"
+    elif points <= 3:
+        level = "Medio"
+    else:
+        level = "Alto"
+
+    return {
+        "points": points,
+        "level": level,
+        "reasons": reasons,
+        "missing_security_headers": missing_headers,
+    }
+
+
 def inspect_target(target: str) -> dict[str, Any]:
     normalized_url = _normalize_target(target)
     parsed = urlparse(normalized_url)

@@ -37,6 +37,10 @@
                             <input id="target" name="target" type="text" placeholder="192.168.1.1 o ejemplo.com" required>
                             <button type="submit">Analizar</button>
                         </div>
+                        <label class="checkbox-field" for="skip-nmap">
+                            <input id="skip-nmap" name="skip_nmap" type="checkbox">
+                            <span>Omitir escaneo nmap</span>
+                        </label>
                     </form>
                     <div id="status-box" class="status-box" aria-live="polite">
                         Esperando objetivo.
@@ -62,6 +66,7 @@
                         <p class="eyebrow">Resumen</p>
                         <h2>Indicadores principales</h2>
                     </div>
+                    <button id="download-report" class="button--secondary" type="button" disabled>Descargar informe JSON</button>
                 </div>
                 <div id="metrics-grid" class="metrics-grid">
                     <article class="metric">
@@ -78,6 +83,10 @@
                     </article>
                     <article class="metric">
                         <span class="metric__label">Puertos abiertos</span>
+                        <strong class="metric__value">Sin datos</strong>
+                    </article>
+                    <article class="metric">
+                        <span class="metric__label">Riesgo</span>
                         <strong class="metric__value">Sin datos</strong>
                     </article>
                 </div>

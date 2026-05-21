@@ -1,6 +1,6 @@
 # Vulneraweb Analytics
 
-Aplicacion web hecha con Python, HTML, CSS y JavaScript para inspeccionar un sitio a nivel basico:
+Aplicacion web hecha con Python, HTML, CSS y JavaScript para inspeccionar vulnerabilidades de un sitio web o IP:
 
 - Resolucion de host e IPs
 - Respuesta HTTP y cabeceras relevantes
@@ -46,10 +46,16 @@ La aplicacion quedara disponible en `http://127.0.0.1:5000`.
 
 ## Nmap
 
-La app intenta ejecutar este comando:
+La app intenta ejecutar este comando cuando el objetivo es un dominio:
 
 ```text
 nmap -Pn -T3 --top-ports 20 <host> -oX -
+```
+
+Cuando el objetivo es una IP, usa un perfil con deteccion de version de servicio:
+
+```text
+nmap -Pn -T3 -sV --top-ports 50 <ip> -oX -
 ```
 
 Si `nmap` no esta instalado o no esta en `PATH`, la aplicacion seguira funcionando y mostrara un aviso.

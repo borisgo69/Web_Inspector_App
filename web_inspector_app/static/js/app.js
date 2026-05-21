@@ -213,6 +213,9 @@ function renderMetrics(data) {
 
 function renderSiteProfile(web) {
     const ips = createTagList(web.ip_addresses || []);
+    const robotsHtml = web.robots_exists
+        ? `<a href="${escapeHtml(web.robots_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(web.robots_url)}</a><pre><code>${escapeHtml(web.robots_preview || "")}</code></pre>`
+        : "No encontrado";
     siteProfile.classList.remove("empty-state");
     siteProfile.innerHTML = `
         ${createDetailItem("Host", asCode(web.host), true)}
@@ -220,7 +223,7 @@ function renderSiteProfile(web) {
         ${createDetailItem("Titulo", web.title || "No encontrado")}
         ${createDetailItem("IP(s)", ips ? `<div class="tag-list">${ips}</div>` : "Sin datos", Boolean(ips))}
         ${createDetailItem("Meta generator", web.meta_generator || "No detectado")}
-        ${createDetailItem("robots.txt", asCode(web.robots_url), true)}
+        ${createDetailItem("robots.txt", robotsHtml, web.robots_exists)}
     `;
 }
 
@@ -326,14 +329,10 @@ function renderTlsAndLinks(web) {
 }
 
 function formatDate(dateValue) {
-    if (!dateValue) {
-        return "Fecha no disponible";
-    }
-
-    return new Date(dateValue).toLocaleString("es-ES", {
-        dateStyle: "short",
-        timeStyle: "short"
-    });
+    if (!dateValue) return "Fecha no disponible";
+    const d = new Date(dateValue);
+    if (isNaN(d)) return "Fecha no disponible";
+    return d.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
 }
 
 function renderHistory(history) {

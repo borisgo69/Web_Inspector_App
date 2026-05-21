@@ -1,4 +1,5 @@
 import html
+import ipaddress
 import socket
 import ssl
 import time
@@ -16,6 +17,22 @@ SECURITY_HEADERS = {
     "x-frame-options": "Falta X-Frame-Options.",
     "referrer-policy": "Falta Referrer-Policy.",
 }
+
+HIGH_RISK_PORTS = {
+    21: "ftp",
+    23: "telnet",
+    3389: "rdp",
+    445: "smb",
+    139: "netbios",
+}
+
+
+def _is_ip_target(target: str) -> bool:
+    try:
+        ipaddress.ip_address(target.strip("[]"))
+        return True
+    except ValueError:
+        return False
 
 
 class DocumentStatsParser(HTMLParser):
@@ -85,7 +102,11 @@ def _normalize_target(target: str) -> str:
         raise ValueError("La URL o el dominio no pueden estar vacios.")
 
     if "://" not in trimmed:
-        trimmed = f"https://{trimmed}"
+        if _is_ip_target(trimmed):
+            host = trimmed.strip("[]")
+            trimmed = f"http://[{host}]" if ":" in host else f"http://{host}"
+        else:
+            trimmed = f"https://{trimmed}"
 
     parsed = urlparse(trimmed)
     if not parsed.hostname:
@@ -146,7 +167,7 @@ def _build_observations(headers: dict[str, str], response_time_ms: int, is_https
     return observations
 
 
-def calculate_risk_report(web_report: dict[str, Any]) -> dict[str, Any]:
+def calculate_risk_report(web_report: dict, nmap_report: dict | None = None) -> dict:
     headers = {
         key.lower(): value
         for key, value in web_report.get("interesting_headers", {}).items()
@@ -182,6 +203,24 @@ def calculate_risk_report(web_report: dict[str, Any]) -> dict[str, Any]:
     if int(web_report.get("response_time_ms") or 0) > 2000:
         points += 1
         reasons.append("La respuesta es lenta.")
+
+    high_risk_open_ports = []
+    if nmap_report:
+        for port_info in nmap_report.get("open_ports", []):
+            try:
+                port_number = int(port_info.get("port") or 0)
+            except (TypeError, ValueError):
+                continue
+
+            if port_number in HIGH_RISK_PORTS:
+                protocol = port_info.get("protocol") or "tcp"
+                service = HIGH_RISK_PORTS[port_number]
+                high_risk_open_ports.append((port_number, protocol, service))
+
+    if high_risk_open_ports:
+        points += 1
+        for port_number, protocol, service in high_risk_open_ports:
+            reasons.append(f"Puerto de alto riesgo abierto: {port_number}/{protocol} ({service}).")
 
     if points <= 1:
         level = "Bajo"
@@ -259,6 +298,18 @@ def inspect_target(target: str) -> dict[str, Any]:
     )
 
     robots_url = urljoin(response.url, "/robots.txt")
+    try:
+        robots_response = requests.get(
+            robots_url,
+            timeout=5,
+            allow_redirects=False,
+            headers={"User-Agent": "VulnerawebAnalytics/1.0"},
+        )
+        robots_exists = robots_response.status_code == 200
+        robots_preview = robots_response.text[:300] if robots_exists else ""
+    except Exception:
+        robots_exists = False
+        robots_preview = ""
 
     return {
         "input": target,
@@ -279,6 +330,8 @@ def inspect_target(target: str) -> dict[str, Any]:
         "interesting_headers": interesting_headers,
         "tls": tls_details,
         "robots_url": robots_url,
+        "robots_exists": robots_exists,
+        "robots_preview": robots_preview,
         "content_length": len(response.text),
         "observations": observations,
     }

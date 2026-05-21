@@ -5,6 +5,14 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 
+def _is_ip_target(host: str) -> bool:
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
+
+
 def _is_valid_scan_target(host: str) -> bool:
     try:
         ipaddress.ip_address(host)
@@ -78,6 +86,10 @@ def _parse_nmap_xml(xml_text: str) -> dict:
 def _build_nmap_command(host: str) -> list[str]:
     raw_command = os.environ.get("NMAP_COMMAND", "nmap")
     base_command = shlex.split(raw_command, posix=False)
+
+    if _is_ip_target(host):
+        return [*base_command, "-Pn", "-T3", "-sV", "--top-ports", "50", host, "-oX", "-"]
+
     return [*base_command, "-Pn", "-T3", "--top-ports", "20", host, "-oX", "-"]
 
 

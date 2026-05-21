@@ -1,1 +1,72 @@
-[]
+[
+  {
+    "generated_at": "2026-05-21T11:15:44.080240+00:00",
+    "target": "192.168.14.138",
+    "host": "192.168.14.138",
+    "final_url": "http://192.168.14.138/",
+    "status_code": 200,
+    "response_time_ms": 17,
+    "open_ports": 12,
+    "command": "nmap -Pn -T3 -sV --top-ports 50 192.168.14.138 -oX -"
+  },
+  {
+    "generated_at": "2026-05-21T11:09:57.541876+00:00",
+    "target": "hack-yourself-first.com",
+    "host": "hack-yourself-first.com",
+    "final_url": "https://hack-yourself-first.com/",
+    "status_code": 200,
+    "response_time_ms": 884,
+    "open_ports": 4,
+    "command": "nmap -Pn -T3 --top-ports 20 hack-yourself-first.com -oX -"
+  },
+  {
+    "generated_at": "2026-05-21T11:03:30.232487+00:00",
+    "target": "http://192.168.14.138",
+    "host": "192.168.14.138",
+    "final_url": "http://192.168.14.138/",
+    "status_code": 200,
+    "response_time_ms": 78,
+    "open_ports": 12,
+    "command": "nmap -Pn -T3 -sV --top-ports 50 192.168.14.138 -oX -"
+  },
+  {
+    "generated_at": "2026-05-21T07:19:17.801142+00:00",
+    "target": "hack-yourself-first.com",
+    "host": "hack-yourself-first.com",
+    "final_url": "https://hack-yourself-first.com/",
+    "status_code": 200,
+    "response_time_ms": 967,
+    "open_ports": 4,
+    "command": "nmap -Pn -T3 --top-ports 20 hack-yourself-first.com -oX -"
+  },
+  {
+    "generated_at": "2026-05-21T07:18:14.664736+00:00",
+    "target": "demo.testfire.net",
+    "host": "demo.testfire.net",
+    "final_url": "https://demo.testfire.net/",
+    "status_code": 200,
+    "response_time_ms": 1049,
+    "open_ports": 4,
+    "command": "nmap -Pn -T3 --top-ports 20 demo.testfire.net -oX -"
+  },
+  {
+    "generated_at": "2026-05-21T07:16:24.660404+00:00",
+    "target": "bwapp.hakhub.net",
+    "host": "bwapp.hakhub.net",
+    "final_url": "https://bwapp.hakhub.net/",
+    "status_code": 502,
+    "response_time_ms": 1942,
+    "open_ports": 3,
+    "command": "nmap -Pn -T3 --top-ports 20 bwapp.hakhub.net -oX -"
+  },
+  {
+    "generated_at": "2026-05-21T07:14:03.962629+00:00",
+    "target": "nmap.org",
+    "host": "nmap.org",
+    "final_url": "https://nmap.org/",
+    "status_code": 200,
+    "response_time_ms": 1069,
+    "open_ports": 4,
+    "command": "nmap -Pn -T3 --top-ports 20 nmap.org -oX -"
+  }
+]

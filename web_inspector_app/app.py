@@ -6,12 +6,15 @@ from threading import Lock
 from urllib.parse import urlparse
 
 from flask import Flask, jsonify, render_template, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from services.nmap_service import run_nmap_scan
 from services.web_analyzer import calculate_risk_report, inspect_target
 
 
 app = Flask(__name__)
+limiter = Limiter(get_remote_address, app=app, default_limits=["30 per minute"])
 BASE_DIR = Path(__file__).resolve().parent
 HISTORY_PATH = BASE_DIR / "data" / "scan_history.json"
 HISTORY_LIMIT = 20
@@ -30,9 +33,11 @@ def _extract_host(target: str) -> str:
 
 
 def _looks_like_invalid_ip(host: str) -> bool:
-    if ":" in host:
-        return True
-
+    try:
+        ipaddress.ip_address(host)
+        return False
+    except ValueError:
+        pass
     return "." in host and all(char.isdigit() or char == "." for char in host)
 
 
@@ -106,7 +111,7 @@ def _load_scan_history() -> list[dict]:
     except (OSError, json.JSONDecodeError):
         return []
 
-    return data if isinstance(data, list) else []
+    return data[:HISTORY_LIMIT] if isinstance(data, list) else []
 
 
 def _write_scan_history(history: list[dict]) -> None:
@@ -158,7 +163,13 @@ def clear_history():
     return jsonify({"ok": True, "history": []})
 
 
+@app.get("/api/health")
+def health():
+    return jsonify({"status": "ok", "version": "1.0.0"})
+
+
 @app.post("/api/inspect")
+@limiter.limit("10 per minute")
 def inspect():
     payload = request.get_json(silent=True) or request.form.to_dict()
     target = (payload.get("target") or "").strip()
@@ -173,7 +184,6 @@ def inspect():
     try:
         _validate_target(target)
         web_report = inspect_target(target)
-        risk_report = calculate_risk_report(web_report)
         if skip_nmap:
             nmap_report = {
                 "available": True,
@@ -185,6 +195,7 @@ def inspect():
             }
         else:
             nmap_report = run_nmap_scan(web_report["host"])
+        risk_report = calculate_risk_report(web_report, nmap_report)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:

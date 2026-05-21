@@ -150,6 +150,14 @@ def history():
     return jsonify({"ok": True, "history": _load_scan_history()})
 
 
+@app.delete("/api/history")
+def clear_history():
+    with history_lock:
+        _write_scan_history([])
+
+    return jsonify({"ok": True, "history": []})
+
+
 @app.post("/api/inspect")
 def inspect():
     payload = request.get_json(silent=True) or request.form.to_dict()

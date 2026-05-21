@@ -2,6 +2,7 @@ const form = document.getElementById("inspect-form");
 const targetInput = document.getElementById("target");
 const skipNmapInput = document.getElementById("skip-nmap");
 const downloadReportButton = document.getElementById("download-report");
+const clearHistoryButton = document.getElementById("clear-history");
 const statusBox = document.getElementById("status-box");
 const metricsGrid = document.getElementById("metrics-grid");
 const siteProfile = document.getElementById("site-profile");
@@ -80,6 +81,12 @@ function renderObservation(observation) {
 function updateDownloadButton() {
     if (downloadReportButton) {
         downloadReportButton.disabled = !lastReport;
+    }
+}
+
+function updateClearHistoryButton(history) {
+    if (clearHistoryButton) {
+        clearHistoryButton.disabled = !Array.isArray(history) || history.length === 0;
     }
 }
 
@@ -331,11 +338,13 @@ function formatDate(dateValue) {
 
 function renderHistory(history) {
     if (!history || history.length === 0) {
+        updateClearHistoryButton(history);
         historyList.classList.add("empty-state");
         historyList.textContent = "Sin escaneos guardados.";
         return;
     }
 
+    updateClearHistoryButton(history);
     historyList.classList.remove("empty-state");
     historyList.innerHTML = history
         .map((entry) => {
@@ -395,8 +404,22 @@ async function loadHistory() {
             renderHistory(data.history);
         }
     } catch {
+        updateClearHistoryButton([]);
         historyList.textContent = "No se ha podido cargar el historial.";
     }
+}
+
+async function clearHistory() {
+    const response = await fetch("/api/history", {
+        method: "DELETE"
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+        throw new Error(data.error || "No se ha podido borrar el historial.");
+    }
+
+    return data.history || [];
 }
 
 if (downloadReportButton) {
@@ -416,6 +439,38 @@ if (downloadReportButton) {
         link.click();
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 0);
+    });
+}
+
+if (clearHistoryButton) {
+    clearHistoryButton.addEventListener("click", async () => {
+        if (!confirm("Borrar todo el historial de escaneos?")) {
+            return;
+        }
+
+        const originalButtonText = clearHistoryButton.textContent;
+        clearHistoryButton.disabled = true;
+        clearHistoryButton.textContent = "Borrando...";
+        clearHistoryButton.classList.add("is-loading");
+        let historyWasCleared = false;
+
+        try {
+            const history = await clearHistory();
+            historyWasCleared = true;
+            if (lastReport) {
+                lastReport.history = history;
+            }
+            renderHistory(history);
+            setStatus("Historial borrado.");
+        } catch (error) {
+            setStatus(error.message, true);
+        } finally {
+            if (!historyWasCleared) {
+                clearHistoryButton.disabled = false;
+            }
+            clearHistoryButton.textContent = originalButtonText;
+            clearHistoryButton.classList.remove("is-loading");
+        }
     });
 }
 

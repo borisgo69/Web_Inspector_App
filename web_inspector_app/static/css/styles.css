@@ -204,6 +204,12 @@ button {
     background: rgba(79, 209, 197, 0.1);
 }
 
+.button--danger {
+    border: 1px solid rgba(239, 68, 68, 0.46);
+    color: #fecaca;
+    background: rgba(239, 68, 68, 0.13);
+}
+
 button:hover {
     transform: translateY(-1px);
     filter: brightness(1.04);
@@ -231,6 +237,11 @@ button.is-loading::after {
     border-radius: 999px;
     vertical-align: -0.1em;
     animation: spin 720ms linear infinite;
+}
+
+.button--danger.is-loading::after {
+    border-color: rgba(254, 202, 202, 0.28);
+    border-top-color: #fecaca;
 }
 
 @keyframes spin {
